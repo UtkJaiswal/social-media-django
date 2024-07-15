@@ -18,26 +18,8 @@ class UserSerializer(serializers.ModelSerializer):
         user.save()
         return user
 
-class EditUserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = '__all__'
 
-class EmailLoginSerializer(serializers.Serializer):
+class LoginSerializer(serializers.Serializer):
     email = serializers.CharField()
     password = serializers.CharField()
 
-class OtpLoginSerializer(serializers.Serializer):
-    i_key = serializers.CharField()
-    _pcode = serializers.CharField()
-
-class ChangePasswordSerializer(serializers.Serializer):
-    old_password = serializers.CharField()
-    new_password = serializers.CharField()
-
-
-
-class ResetPasswordsSerializer(serializers.Serializer):
-    password = serializers.CharField()
-    confirm_password = serializers.CharField()
-    key = serializers.CharField(max_length= 25)
