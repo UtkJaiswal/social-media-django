@@ -7,4 +7,6 @@ urlpatterns = [
     path('get_received_pending_requests/', GetReceivedPendingRequests.as_view()),
     path('accept_request/', AcceptRequest.as_view()),
     path('send_request/', SendRequest.as_view()),
+    path('reject_request/', RejectRequest.as_view()),
+    path('search_user/', SearchUser.as_view()),
 ]

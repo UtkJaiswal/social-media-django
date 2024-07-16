@@ -3,6 +3,9 @@ from rest_framework.views import APIView
 from user.views import *
 from rest_framework import status
 from .models import *
+from datetime import datetime, timedelta
+import json
+
 
 
 
@@ -16,7 +19,7 @@ class GetFriendsList(APIView):
         result['result'] = {"message":"Unauthorized access","data" :{}}
         try:
             data = request.user_data
-            friend_list = Request.objects.filter(from_user = data['id'], status="Approved").values('to_user__name')
+            friend_list = Request.objects.filter(from_user = data['id'], status="Approved").values('to_user__id','to_user__name')
             result['status']    =   "OK"
             result['valid']     =   True
             result['result']['message'] =   "Friends list fetched successfully"
@@ -36,7 +39,7 @@ class GetSentPendingRequests(APIView):
         try:
             logged_user_data = request.user_data
 
-            sent_pending_requests = Request.objects.filter(from_user = logged_user_data['id'], status="Pending").values('to_user__name')
+            sent_pending_requests = Request.objects.filter(from_user = logged_user_data['id'], status="Pending").values('to_user__id','to_user__name')
             result['status']    =   "OK"
             result['valid']     =   True
             result['result']['message'] =   "Sent pending requests fetched successfully"
@@ -55,7 +58,7 @@ class GetReceivedPendingRequests(APIView):
         result['result'] = {"message":"Unauthorized access","data" :{}}
         try:
             logged_user_data = request.user_data
-            received_pending_requests = Request.objects.filter(to_user = logged_user_data['id'], status="Pending").values('from_user__name')
+            received_pending_requests = Request.objects.filter(to_user = logged_user_data['id'], status="Pending").values('from_user__id','from_user__name')
             result['status']    =   "OK"
             result['valid']     =   True
             result['result']['message'] =   "Received pending requests fetched successfully"
@@ -104,6 +107,41 @@ class SendRequest(APIView):
             from_user = User.objects.get(id=logged_user_data['id'])
             to_user = User.objects.get(id=to_user_id)
 
+            
+            current_time = datetime.now()
+            last_three_times = from_user.last_three_request_times
+
+            
+            last_three_times = [datetime.fromisoformat(t) for t in last_three_times]
+            last_three_times = [t for t in last_three_times if current_time - t < timedelta(minutes=1)]
+
+            if len(last_three_times) >= 3:
+                result['result']['message'] = "Cannot send more than 3 requests within a minute"
+                return Response(result, status=status.HTTP_429_TOO_MANY_REQUESTS)
+            
+            is_request_data = Request.objects.filter(from_user=logged_user_data['id'], to_user=to_user_id)
+
+            if len(is_request_data) != 0:
+                result['result']['message'] = "Cannot send request"
+                return Response(result, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+            is_request_data = Request.objects.filter(from_user=to_user_id, to_user=logged_user_data['id'])
+
+            if len(is_request_data) != 0:
+                result['result']['message'] = "Cannot send request"
+                return Response(result, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            
+            last_three_times.append(current_time)
+
+           
+            last_three_times = last_three_times[-3:]
+
+            
+            from_user.last_three_request_times = [t.isoformat() for t in last_three_times]
+            from_user.save()
+
             data = {
                 "from_user": from_user,
                 "to_user": to_user,
@@ -121,6 +159,7 @@ class SendRequest(APIView):
             result['result']['message'] = str(e)
             return Response(result, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
+
 class RejectRequest(APIView):
     @handle_auth_exceptions
     def post(self, request):
@@ -146,4 +185,46 @@ class RejectRequest(APIView):
 
 
 
-    
+class SearchUser(APIView):
+    @handle_auth_exceptions
+    def post(self, request):
+        result = {
+            'status': 'NOK',
+            'valid': False,
+            'result': {"message": "Unauthorized access", "data": {}}
+        }
+
+        try:
+            search_string = request.data.get('search_string', '')
+
+            if not search_string:
+                result['result']['message'] = "Search string is required"
+                return Response(result, status=status.HTTP_400_BAD_REQUEST)
+
+            
+            user_by_email = User.objects.filter(email=search_string).first()
+            if user_by_email:
+                result['status'] = "OK"
+                result['valid'] = True
+                result['result']['message'] = "User found by email"
+                result['result']['data'] = {
+                    'id': user_by_email.id,
+                    'name': user_by_email.name
+                }
+                return Response(result, status=status.HTTP_200_OK)
+
+            
+            users_by_name = User.objects.filter(name__icontains=search_string)
+            if users_by_name.exists():
+                users_list = [{'id': user.id, 'name': user.name} for user in users_by_name]
+                result['status'] = "OK"
+                result['valid'] = True
+                result['result']['message'] = "Users found by name"
+                result['result']['data'] = users_list
+                return Response(result, status=status.HTTP_200_OK)
+
+            result['result']['message'] = "No users found"
+            return Response(result, status=status.HTTP_200_OK)
+        except Exception as e:
+            result['result']['message'] = str(e)
+            return Response(result, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

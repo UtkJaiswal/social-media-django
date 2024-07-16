@@ -20,6 +20,7 @@ class User(AbstractBaseUser):
     phone = models.CharField(max_length=10)
     age = models.CharField(max_length = 5 )
     gender = models.CharField(max_length = 10 )
+    last_three_request_times = models.JSONField(default=list)
 
     objects = UserManager()
 

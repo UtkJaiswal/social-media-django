@@ -98,11 +98,14 @@ class RegisterUser(APIView):
             serializer       = UserSerializer(data = request.data)
             if serializer.is_valid():
                 serializer.save()
+
+                response_data = serializer.data
+                response_data.pop('password', None)
                     
                 result['status']    =   "OK"
                 result['valid']     =   True
                 result['result']['message'] =   "User registered successfully"
-                result['result']['data'] = serializer.data
+                result['result']['data'] = response_data
                 return Response(result,status=status.HTTP_200_OK)
 
             else:
