@@ -1,16 +1,14 @@
-from django.shortcuts import render
 from rest_framework.views import APIView
 from user.views import *
 from rest_framework import status
 from .models import *
 from datetime import datetime, timedelta
-import json
+from rest_framework.pagination import PageNumberPagination
 
 
 
 
-# Create your views here.
-class GetFriendsList(APIView):
+class GetFriendsList(APIView,PageNumberPagination):
     @handle_auth_exceptions
     def get(self, request):
         result = {}
@@ -20,16 +18,27 @@ class GetFriendsList(APIView):
         try:
             data = request.user_data
             friend_list = Request.objects.filter(from_user = data['id'], status="Approved").values('to_user__id','to_user__name')
+
+            paginated_data = self.paginate_queryset(friend_list,request, view=self)
+            paginated_data = self.get_paginated_response(paginated_data).data
+
             result['status']    =   "OK"
             result['valid']     =   True
             result['result']['message'] =   "Friends list fetched successfully"
-            result['result']['data'] = friend_list
+            result['result']['next'] = paginated_data['next']
+            result['result']['previous'] = paginated_data['previous']
+            result['result']['count'] = paginated_data['count']
+            result['result']['data'] = paginated_data['results']
+
             return Response(result,status=status.HTTP_200_OK)
         except Exception as e:
             result['result']['message'] = str(e)
             return Response(result, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
-class GetSentPendingRequests(APIView):
+
+
+        
+class GetSentPendingRequests(APIView, PageNumberPagination):
     @handle_auth_exceptions
     def get(self, request):
         result = {}
@@ -40,16 +49,28 @@ class GetSentPendingRequests(APIView):
             logged_user_data = request.user_data
 
             sent_pending_requests = Request.objects.filter(from_user = logged_user_data['id'], status="Pending").values('to_user__id','to_user__name')
+
+            paginated_data = self.paginate_queryset(sent_pending_requests,request, view=self)
+            paginated_data = self.get_paginated_response(paginated_data).data
+
             result['status']    =   "OK"
             result['valid']     =   True
             result['result']['message'] =   "Sent pending requests fetched successfully"
-            result['result']['data'] = sent_pending_requests
+            result['result']['next'] = paginated_data['next']
+            result['result']['previous'] = paginated_data['previous']
+            result['result']['count'] = paginated_data['count']
+            result['result']['data'] = paginated_data['results']
+
             return Response(result,status=status.HTTP_200_OK)
         except Exception as e:
             result['result']['message'] = str(e)
             return Response(result, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
 
-class GetReceivedPendingRequests(APIView):
+
+
+
+class GetReceivedPendingRequests(APIView, PageNumberPagination):
     @handle_auth_exceptions
     def get(self, request):
         result = {}
@@ -59,14 +80,26 @@ class GetReceivedPendingRequests(APIView):
         try:
             logged_user_data = request.user_data
             received_pending_requests = Request.objects.filter(to_user = logged_user_data['id'], status="Pending").values('from_user__id','from_user__name')
+
+            paginated_data = self.paginate_queryset(received_pending_requests,request, view=self)
+            paginated_data = self.get_paginated_response(paginated_data).data
+
             result['status']    =   "OK"
             result['valid']     =   True
             result['result']['message'] =   "Received pending requests fetched successfully"
-            result['result']['data'] = received_pending_requests
+            result['result']['next'] = paginated_data['next']
+            result['result']['previous'] = paginated_data['previous']
+            result['result']['count'] = paginated_data['count']
+            result['result']['data'] = paginated_data['results']
+
             return Response(result,status=status.HTTP_200_OK)
         except Exception as e:
             result['result']['message'] = str(e)
             return Response(result, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
+
+
 
 class AcceptRequest(APIView):
     @handle_auth_exceptions
@@ -90,6 +123,9 @@ class AcceptRequest(APIView):
         except Exception as e:
             result['result']['message'] = str(e)
             return Response(result, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
+
         
 class SendRequest(APIView):
     @handle_auth_exceptions
@@ -160,6 +196,9 @@ class SendRequest(APIView):
             return Response(result, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
 
+
+        
+
 class RejectRequest(APIView):
     @handle_auth_exceptions
     def post(self, request):
@@ -185,7 +224,7 @@ class RejectRequest(APIView):
 
 
 
-class SearchUser(APIView):
+class SearchUser(APIView, PageNumberPagination):
     @handle_auth_exceptions
     def post(self, request):
         result = {
@@ -202,25 +241,45 @@ class SearchUser(APIView):
                 return Response(result, status=status.HTTP_400_BAD_REQUEST)
 
             
-            user_by_email = User.objects.filter(email=search_string).first()
-            if user_by_email:
+            user_by_email = User.objects.filter(email=search_string)
+
+            
+
+            if len(user_by_email)>0:
+                users_list = [{'id': user.id, 'name': user.name} for user in user_by_email]
+
+                paginated_data = self.paginate_queryset(users_list,request, view=self)
+                paginated_data = self.get_paginated_response(paginated_data).data
+
                 result['status'] = "OK"
                 result['valid'] = True
                 result['result']['message'] = "User found by email"
-                result['result']['data'] = {
-                    'id': user_by_email.id,
-                    'name': user_by_email.name
-                }
+                # result['result']['data'] = {
+                #     'id': user_by_email.id,
+                #     'name': user_by_email.name
+                # }
+                result['result']['next'] = paginated_data['next']
+                result['result']['previous'] = paginated_data['previous']
+                result['result']['count'] = paginated_data['count']
+                result['result']['data'] = paginated_data['results']
                 return Response(result, status=status.HTTP_200_OK)
 
             
             users_by_name = User.objects.filter(name__icontains=search_string)
             if users_by_name.exists():
                 users_list = [{'id': user.id, 'name': user.name} for user in users_by_name]
+
+                paginated_data = self.paginate_queryset(users_list,request, view=self)
+                paginated_data = self.get_paginated_response(paginated_data).data
+
                 result['status'] = "OK"
                 result['valid'] = True
                 result['result']['message'] = "Users found by name"
-                result['result']['data'] = users_list
+                result['result']['next'] = paginated_data['next']
+                result['result']['previous'] = paginated_data['previous']
+                result['result']['count'] = paginated_data['count']
+                result['result']['data'] = paginated_data['results']
+                
                 return Response(result, status=status.HTTP_200_OK)
 
             result['result']['message'] = "No users found"

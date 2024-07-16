@@ -5,23 +5,10 @@ from .serializers import *
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from django.db.models import Q
 from rest_framework.pagination import PageNumberPagination
 from django.contrib.auth.hashers import check_password
-from datetime import datetime, timedelta
-# import openpyxl
-from django.core.mail import send_mail
-from django.template.loader import render_to_string
-import random,string
-from django.utils import timezone 
 
 
-def validatedate(date_text):
-    try:
-        datetime.strptime(date_text,'%Y-%m-%d')
-        return True
-    except :
-        return False
 
 
 
@@ -31,13 +18,14 @@ def generate_token(id, name,phone,email,gender,age):
         'name' : name,
         'phone':phone,
         'email' : email,
-        # 'password': password,
         'gender':gender,
-        'age':age,
-        # 'exp': datetime.utcnow() + timedelta(hours=24),
+        'age':age
     }
     token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm='HS512')
     return token
+
+
+
 
 def handle_auth_exceptions(func):
     def wrapper(*args, **kwargs):
@@ -75,6 +63,10 @@ def handle_auth_exceptions(func):
             result['result']['message'] = str(e)
             return Response(result, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     return wrapper
+
+
+
+
 
 class RegisterUser(APIView):
     def post(self,request):
@@ -130,6 +122,7 @@ class Login(APIView):
         serializer = LoginSerializer(data = request.data)
         if serializer.is_valid():
             email           = serializer.validated_data['email']
+            email           = email.lower()
             password        = serializer.validated_data['password']
             try:
                 user_data       = User.objects.get(email=email)
