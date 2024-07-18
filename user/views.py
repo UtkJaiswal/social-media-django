@@ -11,7 +11,7 @@ from django.contrib.auth.hashers import check_password
 
 
 
-
+# function to generate token for a logged in user
 def generate_token(id, name,phone,email,gender,age):
     payload = {
         'id':id,
@@ -26,7 +26,7 @@ def generate_token(id, name,phone,email,gender,age):
 
 
 
-
+# function to handle authentication
 def handle_auth_exceptions(func):
     def wrapper(*args, **kwargs):
         result = {}
@@ -67,7 +67,7 @@ def handle_auth_exceptions(func):
 
 
 
-
+# POST API to register a user
 class RegisterUser(APIView):
     def post(self,request):
         result = {}
@@ -76,10 +76,10 @@ class RegisterUser(APIView):
         result['result'] = {"message":"Unauthorized access","data" :{}}
 
         try:
-
+            # email field
             email = request.data['email']
             
-
+            # logic to check if user with this email already exists or not
             if len(email)>0:
                 email_data = User.objects.filter(email=email)
                 if len(email_data)>0:
@@ -92,6 +92,8 @@ class RegisterUser(APIView):
                 serializer.save()
 
                 response_data = serializer.data
+
+                # remove password from the response
                 response_data.pop('password', None)
                     
                 result['status']    =   "OK"
@@ -112,31 +114,46 @@ class RegisterUser(APIView):
 
 
 
-
+# POST API to login a user
 class Login(APIView):
     def post(self,request):
         result = {}
         result['status']    =   "NOK"
         result['valid']     =   False
         result['result']    =   {"message":"Unauthorized access","data":{}}
+
         serializer = LoginSerializer(data = request.data)
+
         if serializer.is_valid():
+
             email           = serializer.validated_data['email']
+
+            # conevr the email to lower case for case insensitive
             email           = email.lower()
             password        = serializer.validated_data['password']
+
             try:
+
+                # fetch the user with the given email
                 user_data       = User.objects.get(email=email)
+
             except Exception as e:
                     result['result']['message'] = "Invalid Username or Password"
                     return Response(result, status=status.HTTP_401_UNAUTHORIZED)
+            
             if (user_data is None):
                 result['result']['message'] = "Invalid username or password"
                 return Response(result, status=status.HTTP_401_UNAUTHORIZED)
+            
             else:
+                # match the hashed password for the user
                 if user_data.check_password(password)==False:
                     result['result']['message'] = "Incorrect password"
                     return Response(result, status=status.HTTP_401_UNAUTHORIZED)
+                
+                # generate the token for the user
                 token                       =   generate_token(user_data.id,user_data.name,user_data.phone,user_data.email,user_data.gender,user_data.age)
+                
                 final_response  =   {
                             'name'          : user_data.name,
                             'user_id'       : user_data.id,
