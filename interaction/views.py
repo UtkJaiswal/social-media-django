@@ -17,9 +17,24 @@ class GetFriendsList(APIView,PageNumberPagination):
         result['result'] = {"message":"Unauthorized access","data" :{}}
         try:
             data = request.user_data
-            friend_list = Request.objects.filter(from_user = data['id'], status="Approved").values('to_user__id','to_user__name')
+            friend_list_from_user = Request.objects.filter(from_user=data['id'], status="Approved").values('to_user__id', 'to_user__name')
+            friend_list_to_user = Request.objects.filter(to_user=data['id'], status="Approved").values('from_user__id', 'from_user__name')
 
-            paginated_data = self.paginate_queryset(friend_list,request, view=self)
+            
+            combined_friend_list = []
+            for friend in friend_list_from_user:
+                combined_friend_list.append({
+                    'id': friend['to_user__id'],
+                    'name': friend['to_user__name']
+                })
+
+            for friend in friend_list_to_user:
+                combined_friend_list.append({
+                    'id': friend['from_user__id'],
+                    'name': friend['from_user__name']
+                })
+
+            paginated_data = self.paginate_queryset(combined_friend_list,request, view=self)
             paginated_data = self.get_paginated_response(paginated_data).data
 
             result['status']    =   "OK"
@@ -50,7 +65,14 @@ class GetSentPendingRequests(APIView, PageNumberPagination):
 
             sent_pending_requests = Request.objects.filter(from_user = logged_user_data['id'], status="Pending").values('to_user__id','to_user__name')
 
-            paginated_data = self.paginate_queryset(sent_pending_requests,request, view=self)
+            final_sent_pending_requests = []
+            for sent_pending_request in sent_pending_requests:
+                final_sent_pending_requests.append({
+                    'id': sent_pending_request['to_user__id'],
+                    'name': sent_pending_request['to_user__name']
+                })
+
+            paginated_data = self.paginate_queryset(final_sent_pending_requests,request, view=self)
             paginated_data = self.get_paginated_response(paginated_data).data
 
             result['status']    =   "OK"
@@ -81,7 +103,14 @@ class GetReceivedPendingRequests(APIView, PageNumberPagination):
             logged_user_data = request.user_data
             received_pending_requests = Request.objects.filter(to_user = logged_user_data['id'], status="Pending").values('from_user__id','from_user__name')
 
-            paginated_data = self.paginate_queryset(received_pending_requests,request, view=self)
+            final_received_pending_requests = []
+            for received_pending_request in received_pending_requests:
+                final_received_pending_requests.append({
+                    'id': received_pending_request['from_user__id'],
+                    'name': received_pending_request['from_user__name']
+                })
+
+            paginated_data = self.paginate_queryset(final_received_pending_requests,request, view=self)
             paginated_data = self.get_paginated_response(paginated_data).data
 
             result['status']    =   "OK"
@@ -139,9 +168,14 @@ class SendRequest(APIView):
         try:
             logged_user_data = request.user_data
             to_user_id = request.data['to_user_id']
+            
 
             from_user = User.objects.get(id=logged_user_data['id'])
             to_user = User.objects.get(id=to_user_id)
+
+            if from_user.id == to_user.id:
+                result['result']['message'] = "Cannot send request to yourself"
+                return Response(result, status=status.HTTP_400_BAD_REQUEST)
 
             
             current_time = datetime.now()
@@ -254,10 +288,6 @@ class SearchUser(APIView, PageNumberPagination):
                 result['status'] = "OK"
                 result['valid'] = True
                 result['result']['message'] = "User found by email"
-                # result['result']['data'] = {
-                #     'id': user_by_email.id,
-                #     'name': user_by_email.name
-                # }
                 result['result']['next'] = paginated_data['next']
                 result['result']['previous'] = paginated_data['previous']
                 result['result']['count'] = paginated_data['count']
