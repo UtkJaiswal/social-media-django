@@ -77,5 +77,8 @@ python manage.py migrate
 
 ```bash
 python manage.py runserver
-```    
+```
+
+## Postman Collection
+[Link to postman collection](https://api.postman.com/collections/28367969-6bd6694f-8fb8-4a0c-9f68-018763a4bb9e?access_key=PMAT-01J32FCPRKM1J9Z6MPQYSBVKKT)
         
